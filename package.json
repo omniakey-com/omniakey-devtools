@@ -1,0 +1,19 @@
+{
+  "name": "omniakey-devtools",
+  "version": "0.1.0",
+  "description": "OmniaKey CLI, MCP server and agent skill for text, image, video and audio workflows.",
+  "type": "module",
+  "bin": { "omniakey": "bin/omniakey.mjs" },
+  "files": ["bin/", "src/", "skills/", "examples/", "docs/", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check bin/omniakey.mjs && node --check src/client.mjs && node --check src/mcp.mjs && npm test"
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.32.1", "zod": "4.6.6" },
+  "repository": { "type": "git", "url": "https://github.com/omniakey-com/omniakey-devtools.git" },
+  "homepage": "https://github.com/omniakey-com/omniakey-devtools#readme",
+  "bugs": "https://github.com/omniakey-com/omniakey-devtools/issues",
+  "keywords": ["omniakey", "mcp", "cli", "agent-skill", "ai", "image", "video"],
+  "license": "MIT"
+}

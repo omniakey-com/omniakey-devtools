@@ -1,0 +1,7 @@
+{
+  "model": "gpt-image-2",
+  "type": "image",
+  "operation": "generate",
+  "input": { "prompt": "A small paper boat on a quiet blue lake, soft morning light" },
+  "parameters": { "size": "1024x1024", "quality": "low", "n": 1 }
+}
