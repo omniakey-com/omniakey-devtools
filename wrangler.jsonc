@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "omniakey-mcp",
+  "account_id": "4fdf839cced1a2d3b3ed1c046c7b6c87",
+  "main": "cloudflare/index.ts",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "mcp.omniakey.com", "custom_domain": true }],
+  "vars": { "PUBLIC_ORIGIN": "https://mcp.omniakey.com" },
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "3689c73e9b05486398fdf67d3899a5bd" }],
+  "durable_objects": {
+    "bindings": [{ "name": "CREDENTIAL_GUARD", "class_name": "CredentialGuard" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CredentialGuard"] }],
+  "ratelimits": [{
+    "name": "EDGE_LIMITER", "namespace_id": "2101",
+    "simple": { "limit": 60, "period": 60 }
+  }],
+  "limits": { "cpu_ms": 1000 },
+  "observability": {
+    "enabled": false,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false }
+  }
+}

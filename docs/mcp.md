@@ -1,6 +1,6 @@
 # OmniaKey MCP
 
-The server runs locally over **stdio**. It forwards authenticated requests to the existing OmniaKey HTTPS API; it does not expose a local HTTP port or a hosted MCP URL. Node.js 22+, npm and Git must be available to the application starting the server.
+Choose the hosted **Streamable HTTP + OAuth** endpoint at `https://mcp.omniakey.com/mcp` using the [remote connection guide](remote-mcp.md), or run locally over **stdio** using the instructions below. Local stdio requires Node.js 22+, npm and Git and exposes no HTTP port.
 
 ## Codex
 
@@ -58,7 +58,7 @@ For VS Code, use its `servers` configuration key instead of `mcpServers` and set
 
 Read-only and mutating tools carry MCP annotations. Your client controls tool permissions; annotations are hints, not an authorization system. `failed` and `canceled` task responses carry `isError: true` together with the actual task state. Waiting timeouts carry `wait_timed_out: true`; this means resume, not success or cancellation.
 
-Server initialization, tool listing and `omniakey_schema` work without credentials. `omniakey_models` and all API calls require a key. The MCP server does not read a browser session, store credentials, execute returned tool calls or download output URLs. Keep stdout reserved for JSON-RPC.
+For local stdio, initialization, tool listing and `omniakey_schema` work without credentials; API calls require an environment key. Local stdio does not store credentials. Remote HTTP requires OAuth for all MCP requests, encrypts the upstream key and lists only authorized tools. Neither transport reads product browser sessions, executes returned tool calls or downloads output URLs. Keep local stdout reserved for JSON-RPC.
 
 ## First check
 

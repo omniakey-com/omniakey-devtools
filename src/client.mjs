@@ -45,6 +45,8 @@ export class OmniaKeyClient {
     this.timeoutMs = timeoutMs;
   }
 
+  /** @param {string} path
+   * @param {{method?: string, body?: unknown, headers?: Record<string, string>, signal?: AbortSignal}} options */
   async request(path, { method = 'GET', body, headers = {}, signal } = {}) {
     if (!this.apiKey) throw new ToolError('missing_api_key', 'Set OMNIAKEY_API_KEY in the environment of the CLI or MCP client.');
     const payload = body === undefined ? undefined : JSON.stringify(body);
@@ -55,11 +57,15 @@ export class OmniaKeyClient {
     try {
       response = await fetch(`${this.baseUrl}${path}`, {
         method,
-        redirect: 'error',
+        redirect: 'manual',
         headers: { Accept: 'application/json', Authorization: `Bearer ${this.apiKey}`, ...(payload ? { 'Content-Type': 'application/json' } : {}), ...headers },
         body: payload,
         signal: requestSignal,
       });
+      if (response.status >= 300 && response.status < 400) {
+        await response.body?.cancel();
+        throw new ToolError('network_error', 'The API returned a redirect, which was refused to protect credentials. A submitted request may still be running.');
+      }
       let size = 0;
       const chunks = [];
       for await (const chunk of response.body ?? []) {

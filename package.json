@@ -3,17 +3,58 @@
   "version": "0.1.0",
   "description": "OmniaKey CLI, MCP server and agent skill for text, image, video and audio workflows.",
   "type": "module",
-  "bin": { "omniakey": "bin/omniakey.mjs" },
-  "files": ["bin/", "src/", "skills/", "examples/", "docs/", "README.md", "LICENSE"],
-  "engines": { "node": ">=22" },
+  "bin": {
+    "omniakey": "bin/omniakey.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "skills/",
+    "examples/",
+    "docs/",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check bin/omniakey.mjs && node --check src/client.mjs && node --check src/mcp.mjs && npm test"
+    "check": "node --check bin/omniakey.mjs && node --check src/client.mjs && node --check src/mcp.mjs && npm test",
+    "check:worker": "tsc -p tsconfig.worker.json && vitest run --config vitest.worker.config.ts",
+    "types:worker": "wrangler types",
+    "build:worker": "wrangler deploy --dry-run --outdir worker-dist",
+    "deploy:worker": "wrangler deploy"
   },
-  "dependencies": { "@modelcontextprotocol/sdk": "1.32.1", "zod": "4.6.6" },
-  "repository": { "type": "git", "url": "https://github.com/omniakey-com/omniakey-devtools.git" },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omniakey-com/omniakey-devtools.git"
+  },
   "homepage": "https://github.com/omniakey-com/omniakey-devtools#readme",
   "bugs": "https://github.com/omniakey-com/omniakey-devtools/issues",
-  "keywords": ["omniakey", "mcp", "cli", "agent-skill", "ai", "image", "video"],
-  "license": "MIT"
+  "keywords": [
+    "omniakey",
+    "mcp",
+    "cli",
+    "agent-skill",
+    "ai",
+    "image",
+    "video"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.8.0",
+    "@cloudflare/workers-types": "5.20261110.1",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0",
+    "wrangler": "4.160.1"
+  }
 }
