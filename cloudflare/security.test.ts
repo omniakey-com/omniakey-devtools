@@ -4,7 +4,7 @@ import { checkKeyPolicy, fingerprint, toolsForScopes, validatePaidRequest } from
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const ORIGIN = 'https://mcp.omniakey.com';
+const ORIGIN = 'https://api.omniakey.com';
 const API = 'https://api.omniakey.com';
 const KEY = 'sk-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL';
 const KEY2 = 'sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv';
@@ -23,7 +23,7 @@ beforeEach(() => {
     expect(request.url).toBe(`${API}${expected.path}`);
     expect(request.method).toBe(expected.method);
     expect(request.redirect).toBe('manual');
-    expect(request.headers.get('User-Agent')).toBe('OmniaKey-MCP/0.2.0 (+https://mcp.omniakey.com)');
+    expect(request.headers.get('User-Agent')).toBe('OmniaKey-MCP/0.2.0 (+https://api.omniakey.com/mcp/)');
     expect(request.headers.get('Authorization')).toBe(`Bearer ${expected.key}`);
     for (const [name, value] of Object.entries(expected.headers)) expect(request.headers.get(name)).toBe(value);
     return Response.json(expected.body, { status: expected.status });
@@ -51,7 +51,7 @@ function keyPolicy(key = KEY, response: Record<string, unknown> = {}) {
   expectUpstream('/v1/dashboard/billing/subscription', key, { object: 'billing_subscription', hard_limit_usd: 10, access_until: Math.floor(Date.now() / 1000) + 86400, ...response });
 }
 async function pendingConsent() {
-  const registration = await jsonPost('/oauth/register', {
+  const registration = await jsonPost('/mcp/oauth/register', {
     client_name: 'Test assistant <script>alert(1)</script>',
     redirect_uris: ['https://client.example/callback'],
     grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none',
@@ -62,7 +62,7 @@ async function pendingConsent() {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
   const query = new URLSearchParams({ client_id: client.client_id, redirect_uri: 'https://client.example/callback', response_type: 'code', resource: `${ORIGIN}/mcp`, code_challenge: challenge, code_challenge_method: 'S256', state: 'test-state' });
-  const consent = await req(`/oauth/authorize?${query}`);
+  const consent = await req(`/mcp/oauth/authorize?${query}`);
   expect(consent.status).toBe(200);
   expect(consent.headers.get('Content-Security-Policy')).toContain("form-action 'self' https://client.example;");
   expect(consent.headers.get('Content-Security-Policy')).toContain("default-src 'none'");
@@ -77,13 +77,13 @@ async function connect({ scopes = [], key = KEY, daily = 5 }: { scopes?: string[
   keyPolicy(key);
   const form = new URLSearchParams({ handle: consent.handle, decision: 'approve', api_key: key, daily_limit: String(daily), lifetime: '3600' });
   for (const scope of scopes) form.append('scope', scope);
-  const approved = await req('/oauth/authorize', { method: 'POST', headers: { Origin: ORIGIN, Cookie: consent.cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() });
+  const approved = await req('/mcp/oauth/authorize', { method: 'POST', headers: { Origin: ORIGIN, Cookie: consent.cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() });
   expect(approved.status, (await approved.clone().text()).match(/<h1>[\s\S]*?<\/p>/)?.[0]).toBe(303);
   const redirect = new URL(approved.headers.get('Location')!);
   expect(redirect.origin).toBe('https://client.example');
   expect(redirect.toString()).not.toContain(key);
   const tokenForm = new URLSearchParams({ grant_type: 'authorization_code', code: redirect.searchParams.get('code')!, client_id: consent.client.client_id, redirect_uri: 'https://client.example/callback', code_verifier: consent.verifier, resource: `${ORIGIN}/mcp` });
-  const tokenResponse = await req('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: tokenForm.toString() });
+  const tokenResponse = await req('/mcp/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: tokenForm.toString() });
   expect(tokenResponse.status).toBe(200);
   const tokens = await tokenResponse.json<{ access_token: string; refresh_token: string; scope: string }>();
   expect(JSON.stringify(tokens)).not.toContain(key);
@@ -104,24 +104,41 @@ describe('public boundary', () => {
     const metadata = await req('/.well-known/oauth-protected-resource/mcp');
     expect(metadata.status).toBe(200);
     expect(await metadata.text()).toContain(`${ORIGIN}/mcp`);
-    const page = await req('/');
+    const page = await req('/mcp/');
     expect(page.headers.get('Cache-Control')).toBe('no-store');
     expect(page.headers.get('Content-Security-Policy')).toContain("form-action 'self'");
   });
 
+  it('publishes discovery for the API host and keeps unrelated paths outside MCP', async () => {
+    const metadata = await (await req('/.well-known/oauth-authorization-server')).json<Record<string, unknown>>();
+    expect(metadata.issuer).toBe(ORIGIN);
+    expect(metadata.authorization_endpoint).toBe(`${ORIGIN}/mcp/oauth/authorize`);
+    expect(metadata.token_endpoint).toBe(`${ORIGIN}/mcp/oauth/token`);
+    expect(metadata.registration_endpoint).toBe(`${ORIGIN}/mcp/oauth/register`);
+    for (const path of ['/', '/v1/models', '/api/provider/pricing', '/stripe/webhook', '/oauth/authorize', '/connections', '/mcp-other']) {
+      expect((await req(path)).status).toBe(404);
+    }
+    expect((await SELF.fetch('https://mcp.omniakey.com/mcp')).status).toBe(404);
+    expect((await req('/mcp/healthz')).status).toBe(200);
+    const management = await req('/mcp/connections');
+    expect(management.status).toBe(200);
+    expect(management.headers.get('Set-Cookie')).toContain('__Host-omniakey-mcp-connections=');
+    expect(await management.text()).toContain('action="/mcp/connections"');
+  });
+
   it('blocks oversized bodies before OAuth handling', async () => {
-    const response = await req('/oauth/register', { method: 'POST', body: 'x'.repeat(17000) });
+    const response = await req('/mcp/oauth/register', { method: 'POST', body: 'x'.repeat(17000) });
     expect(response.status).toBe(413);
   });
 
   it('requires PKCE S256 and a browser-bound, same-origin, one-use consent', async () => {
     const consent = await pendingConsent();
     const form = new URLSearchParams({ handle: consent.handle, decision: 'approve', api_key: KEY, daily_limit: '5', lifetime: '3600' });
-    expect((await req('/oauth/authorize', { method: 'POST', headers: { Origin: 'https://evil.example', Cookie: consent.cookie }, body: form.toString() })).status).toBe(403);
-    expect((await req('/oauth/authorize', { method: 'POST', headers: { Origin: ORIGIN }, body: form.toString() })).status).toBe(400);
+    expect((await req('/mcp/oauth/authorize', { method: 'POST', headers: { Origin: 'https://evil.example', Cookie: consent.cookie }, body: form.toString() })).status).toBe(403);
+    expect((await req('/mcp/oauth/authorize', { method: 'POST', headers: { Origin: ORIGIN }, body: form.toString() })).status).toBe(400);
     consent.query.delete('code_challenge');
     consent.query.delete('code_challenge_method');
-    expect((await req(`/oauth/authorize?${consent.query}`)).status).toBe(400);
+    expect((await req(`/mcp/oauth/authorize?${consent.query}`)).status).toBe(400);
     expect(consent.page).not.toMatch(/value="omniakey:generate"[^>]*checked/);
   });
 });
@@ -200,7 +217,7 @@ describe('credential and permission isolation', () => {
     const consent = await pendingConsent();
     keyPolicy(KEY, { hard_limit_usd: 100000000 });
     const form = new URLSearchParams({ handle: consent.handle, decision: 'approve', api_key: KEY, daily_limit: '5', lifetime: '3600' });
-    const response = await req('/oauth/authorize', { method: 'POST', headers: { Origin: ORIGIN, Cookie: consent.cookie }, body: form.toString() });
+    const response = await req('/mcp/oauth/authorize', { method: 'POST', headers: { Origin: ORIGIN, Cookie: consent.cookie }, body: form.toString() });
     expect(response.status).toBe(400);
     expect(response.headers.get('Location')).toBeNull();
     expect(await response.text()).not.toContain(KEY);
@@ -256,10 +273,10 @@ describe('spending and revocation', () => {
 
   it('revokes through the browser without reflecting the key or allowing another key to revoke', async () => {
     const auth = await connect();
-    const page = await req('/connections');
+    const page = await req('/mcp/connections');
     const pageText = await page.text();
     const csrf = pageText.match(/name="csrf" value="([^"]+)"/)![1];
-    const post = (form: URLSearchParams) => req('/connections', { method: 'POST', headers: { Origin: ORIGIN, Cookie: cookie(page) }, body: form.toString() });
+    const post = (form: URLSearchParams) => req('/mcp/connections', { method: 'POST', headers: { Origin: ORIGIN, Cookie: cookie(page) }, body: form.toString() });
     const listing = await post(new URLSearchParams({ csrf, api_key: KEY, action: 'list' }));
     const listingText = await listing.text();
     expect(listingText).not.toContain(KEY);
@@ -268,7 +285,7 @@ describe('spending and revocation', () => {
     expect((await rpc(auth.access_token, 'tools/list')).status).toBe(200);
     expect((await post(new URLSearchParams({ csrf, api_key: KEY, action: 'revoke', grant_id: grantId }))).status).toBe(200);
     expect((await rpc(auth.access_token, 'tools/list')).status).toBe(401);
-    expect((await req('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: auth.refresh_token, client_id: auth.consent.client.client_id, resource: `${ORIGIN}/mcp` }).toString() })).status).toBe(400);
+    expect((await req('/mcp/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: auth.refresh_token, client_id: auth.consent.client.client_id, resource: `${ORIGIN}/mcp` }).toString() })).status).toBe(400);
   });
 
   it('blocks a connection based on authoritative expiry even if OAuth KV still has its token', async () => {
@@ -278,12 +295,12 @@ describe('spending and revocation', () => {
       state.storage.sql.exec('UPDATE connections SET expires = 1');
     });
     expect((await rpc(auth.access_token, 'tools/list')).status).toBe(401);
-    expect((await req('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: auth.refresh_token, client_id: auth.consent.client.client_id, resource: `${ORIGIN}/mcp` }).toString() })).status).toBe(400);
+    expect((await req('/mcp/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: auth.refresh_token, client_id: auth.consent.client.client_id, resource: `${ORIGIN}/mcp` }).toString() })).status).toBe(400);
   });
 
   it('authorization codes cannot be exchanged twice', async () => {
     const auth = await connect();
-    const response = await req('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: auth.tokenForm.toString() });
+    const response = await req('/mcp/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: auth.tokenForm.toString() });
     expect(response.status).toBe(400);
   });
 });

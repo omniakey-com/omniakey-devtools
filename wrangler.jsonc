@@ -7,8 +7,12 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
   "preview_urls": false,
-  "routes": [{ "pattern": "mcp.omniakey.com", "custom_domain": true }],
-  "vars": { "PUBLIC_ORIGIN": "https://mcp.omniakey.com" },
+  "routes": [
+    { "pattern": "https://api.omniakey.com/mcp*", "zone_name": "omniakey.com" },
+    { "pattern": "https://api.omniakey.com/.well-known/oauth-authorization-server*", "zone_name": "omniakey.com" },
+    { "pattern": "https://api.omniakey.com/.well-known/oauth-protected-resource/mcp*", "zone_name": "omniakey.com" }
+  ],
+  "vars": { "PUBLIC_ORIGIN": "https://api.omniakey.com" },
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "3689c73e9b05486398fdf67d3899a5bd" }],
   "durable_objects": {
     "bindings": [{ "name": "CREDENTIAL_GUARD", "class_name": "CredentialGuard" }]

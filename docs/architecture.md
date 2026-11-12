@@ -2,9 +2,9 @@
 
 CLI / local stdio MCP -> shared client -> `https://api.omniakey.com/v1` -> existing OmniaKey gateway.
 
-Remote MCP client -> OAuth + Streamable HTTP at `mcp.omniakey.com` -> per-key Durable Object guard -> shared client -> the same public API.
+Remote MCP client -> OAuth + Streamable HTTP at `https://api.omniakey.com/mcp` -> per-key Durable Object guard -> shared client -> the same public API.
 
-The Skill is an operating guide, not an additional runtime. The main website documents installation. The remote MCP domain hosts authorization and connection management forms; it does not share the main website's session.
+The Skill is an operating guide, not an additional runtime. The main website documents installation. Cloudflare Workers Routes dispatch `/mcp*` and the OAuth discovery paths to the MCP Worker; existing data-plane and payment paths continue to the gateway origin. Authorization and connection management forms live under `/mcp/`, with dedicated host-only consent/CSRF cookies and no product session access. The Worker is not the custom-domain origin for the API hostname.
 
 | Operation | Existing API |
 | --- | --- |

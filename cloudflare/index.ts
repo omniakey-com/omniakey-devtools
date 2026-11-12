@@ -6,21 +6,24 @@ import { authorize, connections, errorPage, landing } from './pages';
 import { boundedText, fingerprint, safeHeaders, SCOPES, toolsForScopes, validProps } from './security';
 export { CredentialGuard } from './guard';
 
+// Cloudflare routes select only /mcp* and the two discovery paths; /v1 and
+// payment callbacks still go directly to the existing origin. No path rewrite
+// or product-cookie forwarding is performed. Only our host-only OAuth/CSRF
+// cookies are read here; credentialed upstream requests use their own headers.
+const OWNED_PATHS = new Set([
+  '/mcp', '/mcp/', '/mcp/connections', '/mcp/healthz',
+  '/mcp/oauth/authorize', '/mcp/oauth/token', '/mcp/oauth/register',
+  '/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource/mcp',
+]);
+
 function providerOptions(origin: string): OAuthProviderOptions<Env> {
   return {
     apiRoute: '/mcp',
     apiHandler: { fetch: serveMcp },
-    defaultHandler: { async fetch(request, env) {
-      const path = new URL(request.url).pathname;
-      const helpers = getOAuthApi(providerOptions(origin), env);
-      if (path === '/oauth/authorize') return authorize(request, env, helpers);
-      if (path === '/connections') return connections(request, env, helpers);
-      if (path === '/' && request.method === 'GET') return landing(origin);
-      if (path === '/healthz' && request.method === 'GET') return Response.json({ status: 'ok', service: 'omniakey-mcp' });
-      return new Response('Not found', { status: 404 });
-    } },
-    authorizeEndpoint: '/oauth/authorize', tokenEndpoint: '/oauth/token',
-    clientRegistrationEndpoint: '/oauth/register',
+    defaultHandler: { fetch: () => new Response('Not found', { status: 404 }) },
+    authorizeEndpoint: '/mcp/oauth/authorize', tokenEndpoint: '/mcp/oauth/token',
+    clientRegistrationEndpoint: '/mcp/oauth/register',
+    cookiePrefix: '__Host-omniakey-mcp-',
     accessTokenTTL: 900, refreshTokenTTL: 7 * 86400, clientRegistrationTTL: 30 * 86400,
     scopesSupported: SCOPES,
     clientIdMetadataDocumentEnabled: true,
@@ -65,6 +68,7 @@ export default {
       // One issuer only. Alternate Workers hosts must never accept credentials.
       if (url.origin !== env.PUBLIC_ORIGIN) return safeHeaders(new Response('Not found', { status: 404 }));
       if (url.protocol !== 'https:') return safeHeaders(new Response('HTTPS required', { status: 400 }));
+      if (!OWNED_PATHS.has(url.pathname)) return safeHeaders(new Response('Not found', { status: 404 }));
       const forbidden = new Set(['access_token', 'token', 'api_key', 'apikey', 'key', 'authorization', 'bearer']);
       if ([...url.searchParams.keys()].some(k => forbidden.has(k.toLowerCase())) ||
           (url.pathname === '/mcp' && url.search)) return safeHeaders(new Response('Credentials and MCP parameters must not appear in URLs.', { status: 400 }));
@@ -72,7 +76,7 @@ export default {
       const origin = request.headers.get('Origin');
       if (url.pathname === '/mcp' && origin && origin !== env.PUBLIC_ORIGIN) return safeHeaders(new Response('Origin not allowed', { status: 403 }));
       const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-      const category = url.pathname.startsWith('/oauth/') || url.pathname === '/connections' ? 'auth' : 'api';
+      const category = url.pathname.startsWith('/mcp/oauth/') || url.pathname === '/mcp/connections' ? 'auth' : 'api';
       const budget = await env.EDGE_LIMITER.limit({ key: `${category}:${ip}` });
       if (!budget.success) return safeHeaders(new Response('Too many requests', { status: 429, headers: { 'Retry-After': '60' } }));
       if (request.method === 'POST') {
@@ -82,7 +86,14 @@ export default {
         headers.delete('Content-Length');
         request = new Request(request, { body, headers });
       }
-      const provider = new OAuthProvider<Env>(providerOptions(env.PUBLIC_ORIGIN));
+      const options = providerOptions(env.PUBLIC_ORIGIN);
+      // Public browser pages must be dispatched before the provider's /mcp
+      // prefix authentication. Token/registration routes remain provider-owned.
+      if (url.pathname === '/mcp/oauth/authorize') return safeHeaders(await authorize(request, env, getOAuthApi(options, env)));
+      if (url.pathname === '/mcp/connections') return safeHeaders(await connections(request, env, getOAuthApi(options, env)));
+      if (url.pathname === '/mcp/' && request.method === 'GET') return safeHeaders(landing(env.PUBLIC_ORIGIN));
+      if (url.pathname === '/mcp/healthz' && request.method === 'GET') return safeHeaders(Response.json({ status: 'ok', service: 'omniakey-mcp' }));
+      const provider = new OAuthProvider<Env>(options);
       return safeHeaders(await provider.fetch(request, env, ctx));
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? error.code : '';

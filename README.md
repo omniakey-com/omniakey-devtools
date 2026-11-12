@@ -6,9 +6,9 @@ One package contains a CLI, a local [MCP server](docs/mcp.md) and an [Agent Skil
 
 ## Connect without a local installation
 
-Add **`https://mcp.omniakey.com/mcp`** to an MCP client that supports Streamable HTTP and OAuth. The browser authorization page accepts a dedicated API key with a finite spending limit and an expiration date. Read access is the default; enable paid generation only when needed. The client receives a separate OAuth token, not your original API key.
+Add **`https://api.omniakey.com/mcp`** to an MCP client that supports Streamable HTTP and OAuth. The browser authorization page accepts a dedicated API key with a finite spending limit and an expiration date. Read access is the default; enable paid generation only when needed. The client receives a separate OAuth token, not your original API key.
 
-Manage or revoke access at [MCP connections](https://mcp.omniakey.com/connections). See [remote setup, limits and deployment](docs/remote-mcp.md). Never paste a key into an agent conversation or tool input.
+Manage or revoke access at [MCP connections](https://api.omniakey.com/mcp/connections). See [remote setup, limits and deployment](docs/remote-mcp.md). Never paste a key into an agent conversation or tool input.
 
 ## Start in a terminal
 

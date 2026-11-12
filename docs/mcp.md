@@ -1,6 +1,6 @@
 # OmniaKey MCP
 
-Choose the hosted **Streamable HTTP + OAuth** endpoint at `https://mcp.omniakey.com/mcp` using the [remote connection guide](remote-mcp.md), or run locally over **stdio** using the instructions below. Local stdio requires Node.js 22+, npm and Git and exposes no HTTP port.
+Choose the hosted **Streamable HTTP + OAuth** endpoint at `https://api.omniakey.com/mcp` using the [remote connection guide](remote-mcp.md), or run locally over **stdio** using the instructions below. Local stdio requires Node.js 22+, npm and Git and exposes no HTTP port.
 
 ## Codex
 

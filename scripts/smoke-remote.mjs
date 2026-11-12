@@ -6,7 +6,7 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const origin = 'https://mcp.omniakey.com';
+const origin = 'https://api.omniakey.com';
 const state = randomBytes(32).toString('base64url');
 const verifier = randomBytes(32).toString('base64url');
 const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -37,7 +37,7 @@ const server = createServer(async (request, response) => {
   const client = new Client({ name: 'omniakey-deployment-check', version: '0.2.0' });
   try {
     if (!url.searchParams.has('code')) throw new Error('Authorization was not approved.');
-    const token = await jsonFetch('/oauth/token', new URLSearchParams({
+    const token = await jsonFetch('/mcp/oauth/token', new URLSearchParams({
       grant_type: 'authorization_code', code: url.searchParams.get('code'),
       client_id: registration.client_id, redirect_uri: redirectUri,
       code_verifier: verifier, resource: `${origin}/mcp`,
@@ -53,7 +53,7 @@ const server = createServer(async (request, response) => {
     const result = await client.callTool({ name: 'omniakey_models', arguments: { limit: 1 } });
     if (result.isError) throw new Error('Model discovery failed; check key validity, limits and model permissions.');
     console.log(JSON.stringify({ liveOAuth: 'passed', mcpHandshake: 'passed', tools: tools.tools.length, modelDiscovery: 'passed', paidCalls: 0 }));
-    response.end('OmniaKey live verification passed: OAuth, MCP handshake and authenticated model discovery. No paid request was made. You may close this tab and revoke the test connection at https://mcp.omniakey.com/connections .');
+    response.end('OmniaKey live verification passed: OAuth, MCP handshake and authenticated model discovery. No paid request was made. You may close this tab and revoke the test connection at https://api.omniakey.com/mcp/connections .');
   } catch (error) {
     // Do not print arbitrary SDK/upstream errors that might include credentials.
     console.error('Live verification failed. Check the key policy and repeat browser authorization; no paid request was made.');
@@ -74,7 +74,7 @@ const deadline = setTimeout(() => {
   process.exitCode = 1;
 }, 10 * 60_000);
 try {
-  registration = await jsonFetch('/oauth/register', {
+  registration = await jsonFetch('/mcp/oauth/register', {
     client_name: 'OmniaKey read-only deployment check', redirect_uris: [redirectUri],
     grant_types: ['authorization_code'], response_types: ['code'], token_endpoint_auth_method: 'none',
   });
@@ -84,7 +84,7 @@ try {
     code_challenge_method: 'S256', state,
   });
   console.log('Keep read-only access and choose a one-hour connection. Enter your limited API key only in this browser page:');
-  console.log(`${origin}/oauth/authorize?${query}`);
+  console.log(`${origin}/mcp/oauth/authorize?${query}`);
 } catch {
   console.error('Could not start live verification; no credentials were printed or saved.');
   server.close();

@@ -1,7 +1,7 @@
 import { OmniaKeyClient, ToolError } from '../src/client.mjs';
 import { API_BASE, checkKeyPolicy, validatePaidRequest, type GrantProps } from './security';
 
-const UPSTREAM_HEADERS = { 'User-Agent': 'OmniaKey-MCP/0.2.0 (+https://mcp.omniakey.com)' };
+const UPSTREAM_HEADERS = { 'User-Agent': 'OmniaKey-MCP/0.2.0 (+https://api.omniakey.com/mcp/)' };
 
 export class RemoteClient extends OmniaKeyClient {
   constructor(private readonly env: Env, private readonly grant: GrantProps) {
