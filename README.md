@@ -2,7 +2,13 @@
 
 Use **OmniaKey** from your terminal or coding agent: discover accessible models, request text completions, and submit, resume or cancel image, video and audio tasks.
 
-One package contains a CLI, a local [MCP server](docs/mcp.md) and an [Agent Skill](skills/omniakey-models/SKILL.md). They call the same public API with your API key. No additional service or account is required.
+One package contains a CLI, a local [MCP server](docs/mcp.md) and an [Agent Skill](skills/omniakey-models/SKILL.md). A hosted [remote MCP server](docs/remote-mcp.md) is also available. All call the same public API with your own OmniaKey key.
+
+## Connect without a local installation
+
+Add **`https://api.omniakey.com/mcp`** to an MCP client that supports Streamable HTTP and OAuth. The browser authorization page accepts a dedicated API key with a finite spending limit and an expiration date. Read access is the default; enable paid generation only when needed. The client receives a separate OAuth token, not your original API key.
+
+Manage or revoke access at [MCP connections](https://api.omniakey.com/mcp/connections). See [remote setup, limits and deployment](docs/remote-mcp.md). Never paste a key into an agent conversation or tool input.
 
 ## Start in a terminal
 
@@ -103,9 +109,11 @@ The Skill teaches discovery, model-specific documentation checks, idempotency, t
 ```bash
 npm ci
 npm run check
+npm run check:worker
+npm run build:worker
 npm pack --dry-run
 ```
 
-Integration tests use a local HTTP server and a real MCP stdio client. They cover authenticated routing, JSON payloads, strict input, terminal states, timeouts, idempotency propagation, credential redaction and redirect refusal. No real API key or paid generation is required. These tests establish client/protocol behavior, not the availability of a particular live model.
+Integration tests use a local HTTP server, real MCP stdio/HTTP clients and the Workers runtime. They cover authenticated routing, OAuth, caller isolation, revocation, spending request limits, strict input, terminal states, timeouts, idempotency, redaction and redirect refusal. No real API key or paid generation is required. These tests establish client/protocol behavior, not the availability of a particular live model.
 
 See [architecture](docs/architecture.md), [security](SECURITY.md) and [MIT license](LICENSE).
